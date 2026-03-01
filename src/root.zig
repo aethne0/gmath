@@ -10,9 +10,7 @@ pub const Vector3 = extern struct {
     _pad: f32 = 0.0,
 
     pub fn init(x: f32, y: f32, z: f32) Self { return .{ .x = x, .y = y, .z = z }; }
-
     pub fn from_array(arr: [3]f32) Self { return .{ .x = arr[0], .y = arr[1], .z = arr[2] }; }
-
     pub fn splat(val: f32) Self { return Self.init( val, val, val ); }
 
     pub const ZERO = splat(0.0);
@@ -79,37 +77,35 @@ pub const Vector3 = extern struct {
     }
 
     /// Rearranges components of vector. 
-    /// `x_src`/`y_src`/`z_src` may be integers 0,1,2, representing x,y,z
-    ///
     /// Example: 
     /// ```
     /// var vec = Vector3.init(4, 5, 6);
-    /// vec.swizzle(2, 0, 1);   // vec is now { 6, 4, 5 }
-    /// vec.swizzle(1, 1, 1);   // vec is now { 4, 4, 4 }
+    /// vec.swizzle("zxy");   // vec is now { 6, 4, 5 }
+    /// vec.swizzle("yyy");   // vec is now { 4, 4, 4 }
     /// ```
-    fn shuffle(a: Self, comptime x_src:i32, comptime y_src:i32, comptime z_src:i32) Self {
-        return @bitCast(@shuffle(f32, a.v().*, undefined, [4]i32{x_src, y_src, z_src, 3}));
+    pub fn swizzle(a: Self, comptime mask: []const u8) Self {
+        if (mask.len != 3) { @compileError("swizzle mask must be length 3"); } 
+
+        comptime var order: [4]i32 = undefined;
+        inline for (mask, 0..) |char, i| {
+            order[i] = switch (char) {
+                'x' => 0, 'y' => 1, 'z' => 2,
+                else => @compileError("swizzle components must be x, y or z"),
+            };
+        }
+        order[3] = 0;
+
+        return @bitCast(@shuffle(f32, a.v().*, undefined, order)); 
     }
 
     pub fn cross(a: Self, b: Self) Self {
-        const a_yzx = a.swizzle(1, 2, 0);
-        const b_yzx = b.swizzle(1, 2, 0);
-        const a_zxy = a.swizzle(2, 0, 1);
-        const b_zxy = b.swizzle(2, 0, 1);
+        const a_yzx = a.swizzle("yzx");
+        const b_yzx = b.swizzle("yzx");
+        const a_zxy = a.swizzle("zxy");
+        const b_zxy = b.swizzle("zxy");
+
         return a_yzx.mul(b_zxy).sub(a_zxy.mul(b_yzx));
     }
 
-    pub fn swizzle(a: Self, comptime mask: []const u8) Self {
-        comptime var order: [3]i32 = undefined;
-        inline for (mask, 0..) |char, i| {
-            order[i] = switch (char) {
-                'x' => 0,
-                'y' => 1,
-                'z' => 2,
-                else => @compileError("Invalid swizzle component"),
-            };
-        }
-        return a.shuffle(order);
-    }
 };
 
