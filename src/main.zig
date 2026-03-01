@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const Vec3 = @import("root.zig").Vector3_f32;
+const V3 = @import("root.zig").Vector3;
 
 /// A fast, non-cryptographic Xoshiro128+ PRNG state
 pub const FastPrng = struct {
@@ -32,14 +32,14 @@ pub const FastPrng = struct {
 };
 
 pub fn main(_: std.process.Init) !void {
-    //     use glam::Vec3;
+    //     use glam::V3;
     // let start = Instant::now();
     // let mut acc = 0.0;
-    //     let mut xx = Vec3::from_array(aa).normalize_or_zero();
-    //     let mut yy = Vec3::from_array(bb).normalize_or_zero();
-    //     xx += Vec3::splat(-0.1);
-    //     yy -= Vec3::splat(-0.1);
-    //     let zz = Vec3::cross(xx, yy);
+    //     let mut xx = V3::from_array(aa).normalize_or_zero();
+    //     let mut yy = V3::from_array(bb).normalize_or_zero();
+    //     xx += V3::splat(-0.1);
+    //     yy -= V3::splat(-0.1);
+    //     let zz = V3::cross(xx, yy);
     //     acc += zz.length();
     // }
     // let end = Instant::now();
@@ -50,7 +50,7 @@ pub fn main(_: std.process.Init) !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const count = 100_000_000;
+    const count = 200_000_000;
     const data = try allocator.alloc([3]f32, count);
     defer allocator.free(data);
 
@@ -70,18 +70,18 @@ pub fn main(_: std.process.Init) !void {
     const start = std.Io.Clock.real.now(t.io());
 
     while (iter.next()) |chunk| {
-        var xx = Vec3.from_array(chunk[0]).norm();
-        var yy = Vec3.from_array(chunk[1]).norm();
+        var xx = V3.from_array(chunk[0]).norm();
+        var yy = V3.from_array(chunk[1]).norm();
 
-        xx = xx.add(Vec3.splat(0.1));
-        yy = yy.sub(Vec3.splat(0.1));
-        const zz = Vec3.cross(xx, yy);
+        xx = xx.add(V3.splat(0.1));
+        yy = yy.sub(V3.splat(0.1));
+        const zz = V3.cross(xx, yy);
         acc += zz.mag();
     }
 
     const end = std.Io.Clock.real.now(t.io());
     var dur: f32 = @floatFromInt(start.durationTo(end).nanoseconds);
-    dur /= std.time.ns_per_s; // seconds
+    dur /= std.time.ns_per_s;
     std.debug.print("acc={}\n", .{acc});
     std.debug.print("{any} secs\n", .{dur});
 }
