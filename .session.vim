@@ -13,13 +13,11 @@ if &shortmess =~ 'A'
 else
   set shortmess=aoO
 endif
-badd +15 src/root.zig
-badd +85 src/main.zig
-badd +179 build.zig
+badd +121 src/main.zig
+badd +240 src/root.zig
 argglobal
 %argdel
 set stal=2
-tabnew +setlocal\ bufhidden=wipe
 tabnew +setlocal\ bufhidden=wipe
 tabrewind
 edit src/root.zig
@@ -30,6 +28,7 @@ set winminheight=0
 set winheight=1
 set winminwidth=0
 set winwidth=1
+tcd ~/prg/z/zphys
 argglobal
 setlocal foldmethod=manual
 setlocal foldexpr=0
@@ -41,33 +40,14 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 93 - ((3 * winheight(0) + 27) / 54)
+let s:l = 240 - ((31 * winheight(0) + 27) / 54)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 93
-normal! 0
+keepjumps 240
+normal! 044|
 tabnext
-edit src/main.zig
-argglobal
-setlocal foldmethod=manual
-setlocal foldexpr=0
-setlocal foldmarker={{{,}}}
-setlocal foldignore=#
-setlocal foldlevel=0
-setlocal foldminlines=1
-setlocal foldnestmax=20
-setlocal foldenable
-silent! normal! zE
-let &fdl = &fdl
-let s:l = 20 - ((19 * winheight(0) + 27) / 54)
-if s:l < 1 | let s:l = 1 | endif
-keepjumps exe s:l
-normal! zt
-keepjumps 20
-normal! 0
-tabnext
-edit build.zig
+edit ~/prg/z/zphys/src/main.zig
 wincmd t
 let s:save_winminheight = &winminheight
 let s:save_winminwidth = &winminwidth
@@ -76,6 +56,7 @@ set winheight=1
 set winminwidth=0
 set winwidth=1
 argglobal
+balt ~/prg/z/zphys/src/root.zig
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -86,13 +67,13 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 166 - ((27 * winheight(0) + 27) / 54)
+let s:l = 120 - ((40 * winheight(0) + 27) / 54)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 166
+keepjumps 120
 normal! 0
-tabnext 3
+tabnext 2
 set stal=1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf
@@ -108,6 +89,7 @@ if filereadable(s:sx)
 endif
 let &g:so = s:so_save | let &g:siso = s:siso_save
 set hlsearch
+nohlsearch
 doautoall SessionLoadPost
 unlet SessionLoad
 " vim: set ft=vim :

@@ -1,5 +1,170 @@
 const std = @import("std");
 
+
+
+/// Row-major
+pub const Matrix44 = extern struct {
+    const Self = @This();
+
+    // Layout wise this is a [4]@Vector(4, f32)
+    v00: f32 align(64), v10: f32, v20: f32, v30: f32,
+    v01: f32,           v11: f32, v21: f32, v31: f32,
+    v02: f32,           v12: f32, v22: f32, v32: f32,
+    v03: f32,           v13: f32, v23: f32, v33: f32,
+
+    pub fn init(vals: [16]f32) Self {
+        var mat: Self = undefined;
+        inline for (0..16) |i| {
+            mat.v_16()[i] = vals[i];
+        }
+        return mat;
+    }
+
+    pub fn init_aligned(vals: *align(16) [16]f32) Self {
+        return @bitCast(vals);
+    }
+
+    pub fn splat(val: f32) Self {
+        return init(@splat(val));
+    }
+
+    pub const IDENTITY = Self.init(
+    [_]f32{
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    });
+
+    pub const ZERO = Self.splat(0);
+    pub const ONE = Self.splat(1);
+
+    /// Cast to 4 packed 4-element f32 vectors
+    inline fn v_4x4(self: anytype) 
+    if (@typeInfo(@TypeOf(self)).pointer.is_const) 
+        *const [4]@Vector(4, f32) 
+    else 
+        *[4]@Vector(4, f32)
+    {
+        return @ptrCast(self);
+    }
+
+    /// Cast to 16-element f32 vector
+    inline fn v_16(self: anytype) 
+    if (@typeInfo(@TypeOf(self)).pointer.is_const) 
+        *const @Vector(16, f32) 
+    else 
+        *@Vector(16, f32)
+    {
+        return @ptrCast(self);
+    }
+
+    /// Element-wise
+    pub fn add(self: Self, other: Self) Self {
+        return @bitCast(self.v_16().* + other.v_16().*);
+    }
+
+    /// Element-wise
+    pub fn sub(self: Self, other: Self) Self {
+        return @bitCast(self.v_16().* - other.v_16().*);
+    }
+
+    /// Element-wise
+    pub fn mul(self: Self, other: Self) Self {
+        return @bitCast(self.v_16().* * other.v_16().*);
+    }
+
+    /// Element-wise
+    pub fn div(self: Self, other: Self) Self {
+        return @bitCast(self.v_16().* / other.v_16().*);
+    }
+
+    pub fn add_scalar(self: Self, scalar: f32) Self {
+        return add(self, splat(scalar));
+    }
+
+    pub fn sub_scalar(self: Self, scalar: f32) Self {
+        return sub(self, splat(scalar));
+    }
+
+    pub fn mul_scalar(self: Self, scalar: f32) Self {
+        return mul(self, splat(scalar));
+    }
+
+    pub fn div_scalar(self: Self, scalar: f32) Self {
+        return div(self, splat(scalar));
+    }
+
+    pub fn reduce_sum(self: Self) f32 {
+        return @reduce(.Add, self.v_16().*);
+    }
+
+    pub fn transpose(self: Self) Self {
+        return @bitCast(
+            @shuffle(f32, self.v_16().*, undefined, 
+                [_]i32{
+                0,  4,  8, 12,
+                1,  5,  9, 13,
+                2,  6, 10, 14,
+                3,  7, 11, 15,
+            })
+        );
+    }
+
+    pub fn init_from_row_major(vals: [16]f32) Self {
+        return init(vals).transpose();
+    }
+
+    pub fn rotation_x(angle: f32) Self {
+        var mat = IDENTITY;
+        mat.v_16()[ 5] =  @cos(angle); mat.v_16()[ 6] = -@sin(angle);
+        mat.v_16()[ 9] =  @sin(angle); mat.v_16()[10] =  @cos(angle);
+        return mat;
+    }
+
+    pub fn rotation_y(angle: f32) Self {
+        var mat = IDENTITY;
+        mat.v_16()[ 0] =  @cos(angle); mat.v_16()[ 2] =  @sin(angle);
+        mat.v_16()[ 8] = -@sin(angle); mat.v_16()[10] =  @cos(angle);
+        return mat;
+    }
+
+    pub fn rotation_z(angle: f32) Self {
+        var mat = IDENTITY;
+        mat.v_16()[ 0] =  @cos(angle); mat.v_16()[ 1] = -@sin(angle);
+        mat.v_16()[ 4] =  @sin(angle); mat.v_16()[ 5] =  @cos(angle);
+        return mat;
+    }
+
+    /// (col0 * col.x) + (col1 * col.y) + (col2 * col.z) + (col3 * col.w)
+    pub fn matmul(self: Self, other: Self) Self {
+        var result: Self = undefined;
+        const a = self.v_4x4();
+        const b = other.v_4x4();
+
+        inline for (0..4) |i| {
+            const col = b[i];
+            
+            var sum: @Vector(4, f32) = a[0] * @as(@Vector(4, f32), @splat(col[0]));
+            sum = @mulAdd(@Vector(4, f32), a[1], @splat(col[1]), sum);
+            sum = @mulAdd(@Vector(4, f32), a[2], @splat(col[2]), sum);
+            sum = @mulAdd(@Vector(4, f32), a[3], @splat(col[3]), sum);
+            
+            result.v_4x4()[i] = sum;
+        }
+        
+        return result;
+    }
+
+    /// temp debug
+    pub fn print(self: Self) void {
+        inline for (0..4) |i| {
+            const row = self.v_4x4()[i];
+            std.debug.print("{} {} {} {}\n", .{row[0], row[1], row[2], row[3]});
+        }
+    }
+};
+
 /// 16-byte aligned 3-dim f32 Vector
 pub const Vector3 = extern struct {
     const Self = @This();
@@ -10,7 +175,13 @@ pub const Vector3 = extern struct {
     _pad: f32 = 0.0,
 
     pub fn init(x: f32, y: f32, z: f32) Self { return .{ .x = x, .y = y, .z = z }; }
+
     pub fn from_array(arr: [3]f32) Self { return .{ .x = arr[0], .y = arr[1], .z = arr[2] }; }
+
+    pub fn from_array_aligned(arr: *align(16) [4]f32) Self {
+        return @bitCast(arr);
+    }
+
     pub fn splat(val: f32) Self { return Self.init( val, val, val ); }
 
     pub const ZERO = splat(0.0);
@@ -18,65 +189,22 @@ pub const Vector3 = extern struct {
     pub const X = init(1.0, 0.0, 0.0);
     pub const Y = init(0.0, 1.0, 0.0);
     pub const Z = init(0.0, 0.0, 1.0);
+    pub const MIN = splat(std.math.floatMin(f32));
+    pub const MAX = splat(std.math.floatMax(f32));
+
+    pub const AXES = [3]Self{X, Y, Z};
 
     /// Casts the vector components to a @Vector(4, f32) for SIMD
-    inline fn v(self: anytype) VType(@TypeOf(self)) {
+    inline fn v_4(self: anytype) 
+    if (@typeInfo(@TypeOf(self)).pointer.is_const) 
+        *const @Vector(4, f32) 
+    else 
+        *@Vector(4, f32)
+    {
         return @ptrCast(self);
     }
 
-    fn VType(comptime T: type) type {
-        const info = @typeInfo(T).pointer;
-        return if (info.is_const) *const @Vector(4, f32) else *@Vector(4, f32);
-    }
-
-    /// Element-wise
-    pub fn add(a: Self, b: Self) Self {
-        var res: Self = undefined;
-        res.v().* = a.v().* + b.v().*;
-        return res;
-    }
-
-    /// Element-wise
-    pub fn sub(a: Self, b: Self) Self {
-        var res: Self = undefined;
-        res.v().* = a.v().* - b.v().*;
-        return res;
-    }
-
-    /// Element-wise
-    pub fn mul(a: Self, b: Self) Self {
-        var res: Self = undefined;
-        res.v().* = a.v().* * b.v().*;
-        return res;
-    }
-
-    /// Element-wise
-    pub fn div(a: Self, b: Self) Self {
-        var res: Self = undefined;
-        res.v().* = a.v().* / b.v().*;
-        res._pad = 0.0;
-        return res;
-    }
-
-    pub fn sum(a: Self) f32 {
-        return @reduce(.Add, a.v().*);
-    }
-
-    pub fn dot(a: Self, b: Self) f32 { return a.mul(b).sum(); }
-
-    /// Magnitude of a
-    pub fn mag(a: Self) f32 { return @sqrt(a.mul(a).sum()); }
-
-    /// Distance from a->b
-    pub fn dist(a: Self, b: Self) f32 { return b.sub(a).mag(); }
-
-    pub fn norm(a: Self) Self {
-        const magnitude = a.mag();
-        if (magnitude == 0.0) { return Self.ZERO; }
-        return a.div(Self.splat(magnitude));
-    }
-
-    /// Rearranges components of vector. 
+    /// Rearranges (swizzles/shuffles) components of vector. 
     /// Example: 
     /// ```
     /// var vec = Vector3.init(4, 5, 6);
@@ -95,17 +223,99 @@ pub const Vector3 = extern struct {
         }
         order[3] = 0;
 
-        return @bitCast(@shuffle(f32, a.v().*, undefined, order)); 
+        return @bitCast(@shuffle(f32, a.v_4().*, undefined, order)); 
     }
+
+    /// Element-wise
+    pub fn add(a: Self, b: Self) Self { return @bitCast(a.v_4().* + b.v_4().*); }
+
+    /// Element-wise
+    pub fn sub(a: Self, b: Self) Self { return @bitCast(a.v_4().* - b.v_4().*); }
+
+    /// Element-wise
+    pub fn mul(a: Self, b: Self) Self { return @bitCast(a.v_4().* * b.v_4().*); }
+
+    /// Element-wise
+    pub fn div(a: Self, b: Self) Self {
+        var res: Self = @bitCast(a.v_4().* / b.v_4().*);
+        res._pad = 0.0;
+        return res;
+    }
+
+    pub fn add_scalar(a: Self, scalar: f32) Self { return a.add(Self.splat(scalar)); }
+
+    pub fn sub_scalar(a: Self, scalar: f32) Self { return a.sub(Self.splat(scalar)); }
+
+    pub fn mul_scalar(a: Self, scalar: f32) Self { return a.mul(Self.splat(scalar)); }
+
+    pub fn div_scalar(a: Self, scalar: f32) Self { return a.div(Self.splat(scalar)); }
+
+    /// Element-wise
+    pub fn min(a: Self, b: Self) Self { return @bitCast(@min(a.v_4().*, b.v_4().*)); }
+
+    /// Element-wise
+    pub fn max(a: Self, b: Self) Self { return @bitCast(@max(a.v_4().*, b.v_4().*)); }
+
+    /// Sum of all elements
+    pub fn sum(a: Self) f32 { return @reduce(.Add, a.v_4().*); }
+
+    /// Product of all elements
+    pub fn product(a: Self) f32 { return @reduce(.Mul, a.v_4().*); }
+
+    /// Dot product of two vectors
+    /// > 0 -> acute angle
+    /// = 0 -> 90 degrees
+    /// < 0 -> obtuse angle
+    pub fn dot(a: Self, b: Self) f32 { return a.mul(b).sum(); }
+
+    /// Magnitude of a
+    pub fn len(a: Self) f32 { return @sqrt(a.mul(a).sum()); }
+
+    /// Distance from a->b
+    pub fn dist(a: Self, b: Self) f32 { return b.sub(a).len(); }
+
+    pub fn norm(a: Self) Self {
+        const a_len = a.len();
+        if (a_len == 0.0) { @panic("tried to normalize zero length vector" ); }
+        return a.div_scalar(a_len);
+    }
+
+    pub fn norm_or_zero(a: Self) Self {
+        const a_len = a.len();
+        if (a_len == 0.0) { return Self.ZERO; }
+        return a.div_scalar(a_len);
+    }
+
+    pub fn transform(self: Self, mat: *const Matrix44) Self {
+        const cols = mat.v_4x4();
+        const v = self.v_4();
+
+        var res = cols[0] * @as(@Vector(4, f32), @splat(v[0])); // Column 0 * x
+        res = @mulAdd(@Vector(4, f32), cols[1], @splat(v[1]), res); // + Column 1 * y
+        res = @mulAdd(@Vector(4, f32), cols[2], @splat(v[2]), res); // + Column 2 * z
+        res = @mulAdd(@Vector(4, f32), cols[3], @splat(v[3]), res); // + Column 3 * w (Translation)
+
+        res[3] = 0;
+        return @bitCast(res);
+    }
+
+    pub fn len_squared(a: Self) f32 { return a.mul(a).sum(); }
+
+    pub fn dist_squared(a: Self, b: Self) f32 { return b.sub(a).len_squared(); }
 
     pub fn cross(a: Self, b: Self) Self {
-        const a_yzx = a.swizzle("yzx");
-        const b_yzx = b.swizzle("yzx");
-        const a_zxy = a.swizzle("zxy");
-        const b_zxy = b.swizzle("zxy");
-
-        return a_yzx.mul(b_zxy).sub(a_zxy.mul(b_yzx));
+        return sub(
+            mul(a.swizzle("yzx"), b.swizzle("zxy")),
+            mul(a.swizzle("zxy"), b.swizzle("yzx"))
+        );
     }
 
+    /// Project a on to b
+    /// b's length doesn't matter but must not be zero
+    /// **PANIC**s if `b.length() == 0`
+    pub fn project(a: Self, b: Self) Self {
+        const b_len_squared = b.len_squared();
+        if (b_len_squared == 0) { @panic("tried to project onto zero length vector"); }
+        return b.mul_scalar( a.dot(b) / b_len_squared );
+    }
 };
-
