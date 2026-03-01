@@ -17,3 +17,4 @@ zig-pkg/
 /build/
 /build-*/
 /docgen_tmp/
+.session.vim
