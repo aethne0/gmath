@@ -1,3 +1,8 @@
+//! ▄▄▄   ▄▄▄· ▄ .▄ ▄· ▄▌.▄▄ · 
+//! ▀▄ █·▐█ ▄███▪▐█▐█▪██▌▐█ ▀. 
+//! ▐▀▀▄  ██▀·██▀▐█▐█▌▐█▪▄▀▀▀█▄
+//! ▐█•█▌▐█▪·•██▌▐▀ ▐█▀·.▐█▄▪▐█
+//! .▀  ▀.▀   ▀▀▀ ·  ▀ •  ▀▀▀▀
 const std = @import("std");
 
 /// Row-major
@@ -209,7 +214,7 @@ pub const Vector3 = extern struct {
     /// vec.swizzle("zxy");   // vec is now { 6, 4, 5 }
     /// vec.swizzle("yyy");   // vec is now { 4, 4, 4 }
     /// ```
-    pub fn swizzle(a: Self, comptime mask: []const u8) Self {
+    pub fn swizzle(self: Self, comptime mask: []const u8) Self {
         if (mask.len != 3) { @compileError("swizzle mask must be length 3"); } 
 
         comptime var order: [4]i32 = undefined;
@@ -221,67 +226,67 @@ pub const Vector3 = extern struct {
         }
         order[3] = 0;
 
-        return @bitCast(@shuffle(f32, a.v_4().*, undefined, order)); 
+        return @bitCast(@shuffle(f32, self.v_4().*, undefined, order)); 
     }
 
     /// Element-wise
-    pub fn add(a: Self, b: Self) Self { return @bitCast(a.v_4().* + b.v_4().*); }
+    pub fn add(self: Self, other: Self) Self { return @bitCast(self.v_4().* + other.v_4().*); }
 
     /// Element-wise
-    pub fn sub(a: Self, b: Self) Self { return @bitCast(a.v_4().* - b.v_4().*); }
+    pub fn sub(self: Self, other: Self) Self { return @bitCast(self.v_4().* - other.v_4().*); }
 
     /// Element-wise
-    pub fn mul(a: Self, b: Self) Self { return @bitCast(a.v_4().* * b.v_4().*); }
+    pub fn mul(self: Self, other: Self) Self { return @bitCast(self.v_4().* * other.v_4().*); }
 
     /// Element-wise
-    pub fn div(a: Self, b: Self) Self {
-        var res: Self = @bitCast(a.v_4().* / b.v_4().*);
+    pub fn div(self: Self, other: Self) Self {
+        var res: Self = @bitCast(self.v_4().* / other.v_4().*);
         res._pad = 0.0;
         return res;
     }
 
-    pub fn add_scalar(a: Self, scalar: f32) Self { return a.add(Self.splat(scalar)); }
+    pub fn add_scalar(self: Self, scalar: f32) Self { return self.add(Self.splat(scalar)); }
 
-    pub fn sub_scalar(a: Self, scalar: f32) Self { return a.sub(Self.splat(scalar)); }
+    pub fn sub_scalar(self: Self, scalar: f32) Self { return self.sub(Self.splat(scalar)); }
 
-    pub fn mul_scalar(a: Self, scalar: f32) Self { return a.mul(Self.splat(scalar)); }
+    pub fn mul_scalar(self: Self, scalar: f32) Self { return self.mul(Self.splat(scalar)); }
 
-    pub fn div_scalar(a: Self, scalar: f32) Self { return a.div(Self.splat(scalar)); }
-
-    /// Element-wise
-    pub fn min(a: Self, b: Self) Self { return @bitCast(@min(a.v_4().*, b.v_4().*)); }
+    pub fn div_scalar(self: Self, scalar: f32) Self { return self.div(Self.splat(scalar)); }
 
     /// Element-wise
-    pub fn max(a: Self, b: Self) Self { return @bitCast(@max(a.v_4().*, b.v_4().*)); }
+    pub fn min(self: Self, other: Self) Self { return @bitCast(@min(self.v_4().*, other.v_4().*)); }
+
+    /// Element-wise
+    pub fn max(self: Self, other: Self) Self { return @bitCast(@max(self.v_4().*, other.v_4().*)); }
 
     /// Sum of all elements
-    pub fn sum(a: Self) f32 { return @reduce(.Add, a.v_4().*); }
+    pub fn sum(self: Self) f32 { return @reduce(.Add, self.v_4().*); }
 
     /// Product of all elements
-    pub fn product(a: Self) f32 { return @reduce(.Mul, a.v_4().*); }
+    pub fn product(self: Self) f32 { return @reduce(.Mul, self.v_4().*); }
 
     /// Dot product of two vectors
     /// > 0 -> acute angle
     /// = 0 -> 90 degrees
     /// < 0 -> obtuse angle
-    pub fn dot(a: Self, b: Self) f32 { return a.mul(b).sum(); }
+    pub fn dot(self: Self, other: Self) f32 { return self.mul(other).sum(); }
 
     /// Magnitude of a
-    pub fn len(a: Self) f32 { return @sqrt(a.mul(a).sum()); }
+    pub fn len(self: Self) f32 { return @sqrt(self.mul(self).sum()); }
 
     /// Distance from a->b
-    pub fn dist(a: Self, b: Self) f32 { return b.sub(a).len(); }
+    pub fn dist(self: Self, other: Self) f32 { return other.sub(self).len(); }
 
-    pub fn norm(a: Self) Self {
-        const a_len = a.len();
+    pub fn norm(self: Self) Self {
+        const a_len = self.len();
         if (a_len == 0.0) { @panic("tried to normalize zero length vector" ); }
-        return a.div_scalar(a_len);
+        return self.div_scalar(a_len);
     }
 
-    pub fn norm_or_zero(a: Self) Self {
-        const a_len = a.len();
+    pub fn norm_or_zero(self: Self) Self {
+        const a_len = self.len();
         if (a_len == 0.0) { return Self.ZERO; }
-        return a.div_scalar(a_len);
+        return self.div_scalar(a_len);
     }
 
     pub fn transform(self: Self, mat: *const Matrix44) Self {
@@ -297,23 +302,23 @@ pub const Vector3 = extern struct {
         return @bitCast(res);
     }
 
-    pub fn len_squared(a: Self) f32 { return a.mul(a).sum(); }
+    pub fn len_squared(self: Self) f32 { return self.mul(self).sum(); }
 
-    pub fn dist_squared(a: Self, b: Self) f32 { return b.sub(a).len_squared(); }
+    pub fn dist_squared(self: Self, other: Self) f32 { return other.sub(self).len_squared(); }
 
-    pub fn cross(a: Self, b: Self) Self {
+    pub fn cross(self: Self, other: Self) Self {
         return sub(
-            mul(a.swizzle("yzx"), b.swizzle("zxy")),
-            mul(a.swizzle("zxy"), b.swizzle("yzx"))
+            mul(self.swizzle("yzx"), other.swizzle("zxy")),
+            mul(self.swizzle("zxy"), other.swizzle("yzx"))
         );
     }
 
     /// Project a on to b
     /// b's length doesn't matter but must not be zero
     /// **PANIC**s if `b.length() == 0`
-    pub fn project(a: Self, b: Self) Self {
-        const b_len_squared = b.len_squared();
+    pub fn project(self: Self, other: Self) Self {
+        const b_len_squared = other.len_squared();
         if (b_len_squared == 0) { @panic("tried to project onto zero length vector"); }
-        return b.mul_scalar( a.dot(b) / b_len_squared );
+        return other.mul_scalar( self.dot(other) / b_len_squared );
     }
 };
