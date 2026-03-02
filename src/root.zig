@@ -1,7 +1,5 @@
 const std = @import("std");
 
-
-
 /// Row-major
 pub const Matrix44 = extern struct {
     const Self = @This();
@@ -290,10 +288,10 @@ pub const Vector3 = extern struct {
         const cols = mat.v_4x4();
         const v = self.v_4();
 
-        var res = cols[0] * @as(@Vector(4, f32), @splat(v[0])); // Column 0 * x
-        res = @mulAdd(@Vector(4, f32), cols[1], @splat(v[1]), res); // + Column 1 * y
-        res = @mulAdd(@Vector(4, f32), cols[2], @splat(v[2]), res); // + Column 2 * z
-        res = @mulAdd(@Vector(4, f32), cols[3], @splat(v[3]), res); // + Column 3 * w (Translation)
+        var res = cols[0] * @as(@Vector(4, f32), @splat(v[0]));
+        res = @mulAdd(@Vector(4, f32), cols[1], @splat(v[1]), res);
+        res = @mulAdd(@Vector(4, f32), cols[2], @splat(v[2]), res);
+        res = @mulAdd(@Vector(4, f32), cols[3], @splat(v[3]), res);
 
         res[3] = 0;
         return @bitCast(res);

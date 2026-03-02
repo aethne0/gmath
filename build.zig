@@ -83,6 +83,11 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    exe.root_module.link_libc = true;
+    exe.root_module.linkSystemLibrary("raylib", .{});
+    exe.use_llvm = true;
+    exe.use_lld = true;
+
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
     // step). By default the install prefix is `zig-out/` but can be overridden
@@ -178,6 +183,11 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+
+    exe_check.root_module.link_libc = true;
+    exe_check.root_module.linkSystemLibrary("raylib", .{});
+    exe_check.use_llvm = true;
+    exe_check.use_lld = true;
 
     const check = b.step("check", "Check if foo compiles");
     check.dependOn(&exe_check.step);
