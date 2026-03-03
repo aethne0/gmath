@@ -41,6 +41,13 @@ pub const Vec4f64  = vec4.Vector4(f64);
 /// 4-dimensional f128 vector
 pub const Vec4f128 = vec4.Vector4(f128);
 
-const mat = @import("matrix.zig");
+const mat4 = @import("matrix4.zig");
+/// 4x4 f32 matrix
+pub const Mat4 = mat4.Mat4(f32);
+/// 4x4 f64 matrix
+pub const Mat4f64 = mat4.Mat4(f64);
+/// 4x4 f128 matrix
+pub const Mat4f128 = mat4.Mat4(f128);
 
 test { std.testing.refAllDecls(@This()); }
+

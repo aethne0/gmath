@@ -1,4 +1,6 @@
 const std = @import("std");
+const vec2 = @import("vector_2.zig");
+const vec4 = @import("vector_4.zig");
 
 pub fn Vector3A(comptime FType: type) type {
     if (FType != f32 and FType != f64 and FType != f128) 
@@ -103,6 +105,52 @@ pub fn Vector3A(comptime FType: type) type {
             return @reduce(.Max, self.as_vec_3());
         }
 
+        pub fn ceil(self: Self) Self {
+            return @bitCast(@ceil(self.as_vec()));
+        }
+
+        pub fn round(self: Self) Self {
+            return @bitCast(@round(self.as_vec()));
+        }
+
+        pub fn floor(self: Self) Self {
+            return @bitCast(@floor(self.as_vec()));
+        }
+
+        pub fn sin(self: Self) FType {
+            return @bitCast(@sin(self.as_vec()));
+        }
+
+        pub fn cos(self: Self) FType {
+            return @bitCast(@cos(self.as_vec()));
+        }
+
+        pub fn ln(self: Self) FType {
+            return @bitCast(@log(self.as_vec()));
+        }
+
+        pub fn log2(self: Self) FType {
+            return @bitCast(@log2(self.as_vec()));
+        }
+
+        /// e^self
+        pub fn exp(self: Self) FType {
+            return @bitCast(@exp(self.as_vec()));
+        }
+
+        /// 2^self
+        pub fn exp2(self: Self) FType {
+            return @bitCast(@exp2(self.as_vec()));
+        }
+
+        pub fn recip(self: Self) FType {
+            return ONE.div(self);
+        }
+
+        pub fn sqrt(self: Self) FType {
+            return @bitCast(@sqrt(self.as_vec()));
+        }
+
         pub fn abs(self: Self) Self {
             return @bitCast(@abs(self.as_vec()));
         }
@@ -132,12 +180,32 @@ pub fn Vector3A(comptime FType: type) type {
             return @bitCast(res);
         }
 
+        pub fn signs(self: Self) Self {
+            // todo: perf
+            return init(std.math.sign(self.x), std.math.sign(self.y), std.math.sign(self.z));
+        }
+
+        pub fn copysign(self: Self, other: Self) Self {
+            // todo: perf
+            return self.abs().mul(other.signs());
+        }
+
+        pub fn saturate(self: Self) Self {
+            // todo: perf maybe
+            return self.clamp(0, 1);
+        }
+
         pub fn length_squared(self: Self) FType {
             return self.mul(self).sum();
         }
 
         pub fn length(self: Self) FType {
             return @sqrt(self.length_squared()); // i BELIEVE in llvm inlining
+        }
+
+        pub fn length_recip(self: Self) FType {
+            // todo: perf
+            return ONE.div(self.length());
         }
 
         /// Distance from self -> other
@@ -151,6 +219,11 @@ pub fn Vector3A(comptime FType: type) type {
         /// When called as a method you can read this as "distanceTo"
         pub fn distance(self: Self, other: Self) FType {
             return @sqrt(distance(self, other));
+        }
+
+        pub fn distance_recip(self: Self, other: Self) FType {
+            // todo: perf
+            return ONE.div(distance(self, other));
         }
 
         pub fn normalize(self: Self) Self {
@@ -199,6 +272,52 @@ pub fn Vector3A(comptime FType: type) type {
             return other.mul_scalar(self.dot(other) / other_length_squared);
         }
 
+        pub fn lerp(self: Self, other: Self, s: FType) Self {
+            const delta = other.sub(self);
+            return self.add(delta.mul_scalar(s));
+        }
+
+        pub fn midpoint(self: Self, other: Self) Self {
+            return add(self, other).div_scalar(2);
+        }
+
+        /// truncates z
+        pub fn to_vec2(self: Self) vec2.Vector2(FType) {
+            return @bitCast(
+                @shuffle(FType, self.as_vec(), undefined, @Vector(2, FType){0, 1})
+            );
+        }
+
+        /// Zero-extends
+        pub fn to_vec4(self: Self) vec4.Vector4(FType) {
+            std.debug.assert(self._pad == 0);
+            return @bitCast(
+                @shuffle(FType, self.as_vec(), undefined, @Vector(4, FType){0, 1, 2, 3})
+            );
+        }
+
+        /// Creates newly sized vector (either 2, 3 or 4) out of arbitrary order
+        pub fn swizzle_and_resize(self: Self, comptime mask: []const u8) 
+            switch (mask.len) {
+                2 => vec2.Vector2(FType),
+                3 => Self,
+                4 => vec4.Vector4(FType),
+                else => @compileError("`swizzle_and_resize` mask length must be 2, 3 or 4"),
+            }
+        {
+            const order_len = if (mask.len == 2) 2 else 4; // keep pad if making a vec3
+            comptime var order: [order_len]isize = undefined;
+            inline for (mask, 0..) |char, i| {
+                order[i] = switch(char) {
+                    'x' => 0, 'y' => 1, 'z' => 2,
+                    else => @compileError("invalid axis label"),
+                };
+            }
+            if (mask.len == 3) order[3] = 0;
+
+            return @bitCast(@shuffle(FType, self.as_vec(), undefined, order));
+        }
+
         // todo: extends etc once more vectors are implemented
     };
 }
@@ -213,6 +332,8 @@ test {
     var asd = Vec3A.Y.neg().mul_scalar(100);
     _ = asd.swizzle("zyx").cross(Vec3A.X).normalize();
     asd = asd.swizzle("zyx").add(Vec3A.X).add(Vec3A.ONE);
+    _ = asd.to_vec4();
+    _ = asd.to_vec2();
     try t.expectEqual(2, asd.x);
     try t.expectEqual(-99, asd.y);
     try t.expectEqual(1, asd.z);
@@ -225,6 +346,12 @@ test {
     try t.expectEqual(0.5, a.x);
     try t.expectEqual(1.0, a.y);
     try t.expectEqual(1.5, a.z);
+
+    var zz3 = a.swizzle_and_resize("xyz");
+    const zz2 = zz3.swizzle_and_resize("xy");
+    const zz4 = zz3.swizzle_and_resize("xyxy");
+    _ = zz2;
+    _ = zz4;
 
     _ = a.max(asd);
 }
