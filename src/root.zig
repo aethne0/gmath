@@ -27,11 +27,11 @@ pub const Vec2f128 = vec2.Vector2(f128);
 
 const vec3_a = @import("vector_3a.zig");
 /// aligned 3-dimensional f32 vector
-pub const Vec3A  = vec3_a.Vector3A(f32);
+pub const Vec3A  = vec3_a.Vec3A;
 /// aligned 3-dimensional f64 vector
-pub const Vec3Af64  = vec3_a.Vector3A(f64);
+pub const Vec3Af64  = vec3_a.Vec3Af64;
 /// aligned 3-dimensional f128 vector
-pub const Vec3Af128 = vec3_a.Vector3A(f128);
+pub const Vec3Af128 = vec3_a.Vec3Af128;
 
 const vec4 = @import("vector_4.zig");
 /// 4-dimensional f32 vector

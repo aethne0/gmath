@@ -1,5 +1,4 @@
 const std = @import("std");
-const arch = @import("features.zig");
 
 pub fn Vector3A(comptime FType: type) type {
     const V2Type = @import("vector_2.zig").Vector2(FType);
@@ -101,6 +100,7 @@ pub fn Vector3A(comptime FType: type) type {
         /// Element-wise divide
         pub fn div(self: Self, other: Self) Self {
             @setRuntimeSafety(false);
+            @setFloatMode(.optimized);
             var result: Self = @bitCast(self.as_vec() / other.as_vec());
             result._pad = 0;
             return result;
@@ -191,31 +191,43 @@ pub fn Vector3A(comptime FType: type) type {
 
         /// Element-wise natural logarithm
         pub fn ln(self: Self) FType {
+            @setRuntimeSafety(false);
+            @setFloatMode(.optimized);
             return @bitCast(@log(self.as_vec()));
         }
 
         /// Element-wise base-2 logarithm
         pub fn log2(self: Self) FType {
+            @setRuntimeSafety(false);
+            @setFloatMode(.optimized);
             return @bitCast(@log2(self.as_vec()));
         }
 
         /// Element-wise e^self
         pub fn exp(self: Self) FType {
+            @setRuntimeSafety(false);
+            @setFloatMode(.optimized);
             return @bitCast(@exp(self.as_vec()));
         }
 
         /// Element-wise 2^self
         pub fn exp2(self: Self) FType {
+            @setRuntimeSafety(false);
+            @setFloatMode(.optimized);
             return @bitCast(@exp2(self.as_vec()));
         }
 
         /// Element-wise reciprocal (1/x)
         pub fn recip(self: Self) FType {
+            @setRuntimeSafety(false);
+            @setFloatMode(.optimized);
             return ONE.div(self);
         }
 
         /// Element-wise sqrt
         pub fn sqrt(self: Self) FType {
+            @setRuntimeSafety(false);
+            @setFloatMode(.optimized);
             return @bitCast(@sqrt(self.as_vec()));
         }
 
@@ -528,16 +540,31 @@ pub fn Vector3A(comptime FType: type) type {
     };
 }
 
+/// aligned 3-dimensional f32 vector
+pub const Vec3A = Vector3A(f32);
+/// aligned 3-dimensional f64 vector
+pub const Vec3Af64 = Vector3A(f64);
+/// aligned 3-dimensional f128 vector
+pub const Vec3Af128 = Vector3A(f128);
 
-test {
-    const Vec3A  = Vector3A(f32);
+const t = std.testing;
 
-    const t = std.testing;
+test "clamp" {
+    var a = Vec3A.init(0, 1, 2).clamp(0.5, 1.5);
+    try t.expectEqual(0.5, a.x);
+    try t.expectEqual(1.0, a.y);
+    try t.expectEqual(1.5, a.z);
+    try t.expectEqual(0, a._pad);
+}
 
+test "swoz" {
     const base = Vec3A.init(1, 2, 3);
     const swoz = base.swizzle_and_resize("x0y");
     const should_be = Vec3A.init(1, 0, 2);
     try t.expect(swoz.eq(should_be));
+}
+
+test "unlabeled_chungus_test" {
 
     var asd = Vec3A.Y.neg().mul_scalar(100);
     _ = asd.swizzle("zyx").cross(Vec3A.X).normalize();
@@ -578,4 +605,3 @@ test {
 
     _ = a.max(asd);
 }
-
