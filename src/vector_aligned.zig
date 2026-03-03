@@ -9,39 +9,35 @@ fn VectorAligned(comptime CT_ftype: type, comptime CT_dims: usize) type {
 
     const CT_size = @sizeOf(CT_ftype) * 4;
 
-    const has_pad   = CT_dims == 3;
-    const has_w     = CT_dims == 4;
-
     return extern struct {
         const Self = @This();
 
-        // 3: (x, y, z, _pad)   4 * fType
-        // 4: (x, y, z, w)      4 * fType
         x:      CT_ftype align(CT_size),
         y:      CT_ftype,
         z:      CT_ftype,
-        _pad:   if (has_pad)    CT_ftype else void = if (has_pad) 0 else {},
-        w:      if (has_w)      CT_ftype else void = if (has_w)   0 else {}, 
+        _pad:   if (CT_dims == 3) CT_ftype else void = if (CT_dims == 3) 0 else {},
+        w:      if (CT_dims == 4) CT_ftype else void = if (CT_dims == 4)   0 else {}, 
 
+        /// Initialize struct with values
+        /// Example: `const some_vec = Vec3A.init(.{1, 2, 3});`
+        fn init(values: anytype) Self {
+            const ArgsType = @TypeOf(values);
+            const info = @typeInfo(ArgsType);
 
-        pub const init = switch (CT_dims) {
-            2 => struct { 
-                fn init(x: CT_ftype, y: CT_ftype) Self {
-                    return .{ .x = x, .y = y };
-                }
-            }.init,
-            3 => struct { 
-                fn init(x: CT_ftype, y: CT_ftype, z: CT_ftype) Self {
-                    return .{ .x = x, .y = y, .z = z };
-                }
-            }.init,
-            4 => struct { 
-                fn init(x: CT_ftype, y: CT_ftype, z: CT_ftype, w: CT_ftype) Self {
-                    return .{ .x = x, .y = y, .z = z, .w = w };
-                }
-            }.init,
-            else => unreachable,
-        };
+            if (info != .@"struct" or !info.@"struct".is_tuple) {
+                @compileError("huh?");
+            }
+
+            const fields = info.@"struct".fields;
+
+            if (fields.len != CT_dims) @compileError("huh?");
+
+            if (CT_dims == 3) {
+                return .{ .x = values[0], .y = values[1], .z = values[2] };
+            } else {
+                return .{ .x = values[0], .y = values[1], .z = values[2], .w = values[3] };
+            }
+        }
 
         pub fn splat(scalar: CT_ftype) Self {
             const result: @Vector(4, CT_ftype) = @splat(scalar);
@@ -255,6 +251,7 @@ test {
     const t = std.testing;
 
     {
+        _ = Vec3A.init(.{1,2,3});
         var asd = Vec3A.axis_unit("y").neg().mul_scalar(100);
         _ = asd.swizzle("zyx").cross(Vec3A.axis_unit("x")).normalize();
         asd = asd.swizzle("zyx").add(Vec3A.axis_unit("x")).add(Vec3A.ONE);
