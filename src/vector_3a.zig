@@ -1,11 +1,13 @@
 const std = @import("std");
-const features = @import("features.zig");
-const vec2 = @import("vector_2.zig");
-const vec4 = @import("vector_4.zig");
+const arch = @import("features.zig");
 
 pub fn Vector3A(comptime FType: type) type {
-    if (FType != f32 and FType != f64 and FType != f128) 
-        @compileError("fType must be f32, f64, f128");
+    const V2Type = @import("vector_2.zig").Vector2(FType);
+    const V4Type = @import("vector_4.zig").Vector4(FType);
+    const RawType = switch (FType) { 
+        f32 => u128, f64 => u256, f128 => u512,
+        else => @compileError("FType must be f32 | f64 | f128"),
+    };
 
     return extern struct {
         const Self = @This();
@@ -74,16 +76,11 @@ pub fn Vector3A(comptime FType: type) type {
             std.debug.assert(self._pad == 0);
             std.debug.assert(other._pad == 0);
 
-            // according to my experiments this emits faster asm than `@Reduce(.And, self == other)`
-            // it just uses wide xor which is lower latency than the packed float compare
-            // features.c.
+            // reference:
+            // const result = erch.x86._mm_add_ps(self.as_vec(), other.as_vec());
+            // return 0 != arch.x86._mm_testz_ps(result, result);
 
-            switch (FType) {
-                f32  => return @as(u128, @bitCast(self.as_vec())) == @as(u128, @bitCast(other.as_vec())),
-                f64  => return @as(u256, @bitCast(self.as_vec())) == @as(u256, @bitCast(other.as_vec())),
-                f128 => return @as(u512, @bitCast(self.as_vec())) == @as(u512, @bitCast(other.as_vec())),
-                else => unreachable,
-            }
+            return @as(RawType, @bitCast(self.as_vec())) == @as(RawType, @bitCast(other.as_vec()));
         }
 
         /// Element-wise add
@@ -103,6 +100,7 @@ pub fn Vector3A(comptime FType: type) type {
 
         /// Element-wise divide
         pub fn div(self: Self, other: Self) Self {
+            @setRuntimeSafety(false);
             var result: Self = @bitCast(self.as_vec() / other.as_vec());
             result._pad = 0;
             return result;
@@ -242,8 +240,11 @@ pub fn Vector3A(comptime FType: type) type {
             //
             // For x86 this seems to use vrsqrtps so big need to mess around.
             @setFloatMode(.optimized);
+            @setRuntimeSafety(false);
             const one: @Vector(4, FType) = @splat(1);
-            return @bitCast(one / @sqrt(self.as_vec()));
+            var result: @Vector(4, FType) = @bitCast(one / @sqrt(self.as_vec()));
+            result[3] = 0;
+            return @bitCast(result);
         }
 
         /// Element-wise absolute value
@@ -272,7 +273,7 @@ pub fn Vector3A(comptime FType: type) type {
         /// Note: This is not gauranteed to observe IEEE 754.
         /// on x86_64 it will probably emit `vmaxps`/`vminps` which do not.
         pub fn clamp(self: Self, lower_bound: FType, upper_bound: FType) Self {
-            if (lower_bound > upper_bound) @panic("called clamp with lower_bound > upper_bound");
+            if (lower_bound > upper_bound) std.debug.panic("called clamp with lower_bound > upper_bound", .{});
 
             var res = self.as_vec();
             res = @min(res, splat(upper_bound).as_vec());
@@ -323,7 +324,8 @@ pub fn Vector3A(comptime FType: type) type {
         /// Sets length of vector to `upper_bound` if it is exceeding `upper_bound`, otherwise does nothing.
         /// Does not affect the direction of the vector. `upper_bound` must be zero or positive.
         pub fn clamp_length_max(self: Self, upper_bound: FType) Self {
-            if (upper_bound < 0) @panic("clamp_length_max upper_bound must be >= 0");
+            if (upper_bound < 0) std.debug.panic("clamp_length_max upper_bound must be >= 0", .{});
+            if (upper_bound == 0) return ZERO;
 
             const sqr_length = self.length_squared();
             const sqr_upper_bound = upper_bound * upper_bound;
@@ -338,10 +340,12 @@ pub fn Vector3A(comptime FType: type) type {
 
         /// Sets length of vector to `lower_bound` if it is less-than `lower_bound`, otherwise does nothing.
         /// Does not affect the direction of the vector. `lower_bound` must be zero or positive.
+        /// PANICS if length of `self` is 0!
         pub fn clamp_length_min(self: Self, lower_bound: FType) Self {
-            if (lower_bound < 0) @panic("clamp_length_min lower_bound must be >= 0");
+            if (lower_bound < 0) std.debug.panic("clamp_length_min lower_bound must be >= 0", .{});
 
             const sqr_length = self.length_squared();
+            if (sqr_length == 0) std.debug.panic("tried to clamp_min_length zero length vector", .{});
             const sqr_lower_bound = lower_bound * lower_bound;
 
             if (sqr_length < sqr_lower_bound) {
@@ -358,12 +362,13 @@ pub fn Vector3A(comptime FType: type) type {
         /// Does not affect the direction of the vector.
         /// `lower_bound` and `upper_bound` must be zero or positive.
         pub fn clamp_length(self: Self, lower_bound: FType, upper_bound: FType) Self {
+            if (lower_bound > upper_bound) std.debug.panic("lower_ bound must be <= upper_bound", .{});
             return self.clamp_length_max(upper_bound).clamp_length_min(lower_bound);
         }
 
         /// Scales vector so that length is `len`, does not affect direction. `len` must be >= 0;
         pub fn set_length(self: Self, len: FType) Self {
-            if (len < 0) @panic("length cannot be < 0");
+            if (len < 0) std.debug.panic("length cannot be < 0", .{});
             @setFloatMode(.optimized);
             return self.mul_scalar(len / self.length_recip());
         }
@@ -393,7 +398,7 @@ pub fn Vector3A(comptime FType: type) type {
         /// PANICS if length is zero!
         pub fn normalize(self: Self) Self {
             const len = self.length();
-            if (len == 0) @panic("tried to normalize zero length vector");
+            if (len == 0) std.debug.panic("tried to normalize zero length vector", .{});
             return self.div_scalar(len);
         }
 
@@ -402,7 +407,7 @@ pub fn Vector3A(comptime FType: type) type {
         /// PANICS if length is zero!
         pub fn normalize_and_length(self: Self) struct { vec: Self, length: FType } {
             const len = self.length();
-            if (len == 0) @panic("tried to normalize zero length vector");
+            if (len == 0) std.debug.panic("tried to normalize zero length vector", .{});
             return .{ .vec = self.div_scalar(len), .length = len };
         }
 
@@ -414,7 +419,6 @@ pub fn Vector3A(comptime FType: type) type {
             return self.div_scalar(len);
         }
         
-        /// Reorders elements of the vector.
         /// Example:
         /// ```zig
         /// const a = Vec3A.init(1, 2, 3);
@@ -447,7 +451,7 @@ pub fn Vector3A(comptime FType: type) type {
         /// PANICS if `other` length is zero!
         pub fn project(self: Self, other: Self) Self {
             const other_length_squared = other.length_squared();
-            if (other_length_squared == 0) @panic("tried to project onto zero length vector");
+            if (other_length_squared == 0) std.debug.panic("tried to project onto zero length vector", .{});
             return other.mul_scalar(self.dot(other) / other_length_squared);
         }
 
@@ -476,14 +480,14 @@ pub fn Vector3A(comptime FType: type) type {
         }
 
         /// Constructs a Vec2 of the same float-type by truncating - discarding z
-        pub fn to_vec2_truncate(self: Self) vec2.Vector2(FType) {
+        pub fn to_vec2_truncate(self: Self) V2Type {
             return @bitCast(
                 @shuffle(FType, self.as_vec(), undefined, @Vector(2, FType){0, 1})
             );
         }
 
         /// Constructs a Vec4 of the same float-type with zero as the new w component - { x, y, z, 0 }
-        pub fn to_vec4_zero_extend(self: Self) vec4.Vector4(FType) {
+        pub fn to_vec4_zero_extend(self: Self) V4Type {
             std.debug.assert(self._pad == 0);
             return @bitCast(
                 @shuffle(FType, self.as_vec(), undefined, @Vector(4, FType){0, 1, 2, 3})
@@ -501,9 +505,7 @@ pub fn Vector3A(comptime FType: type) type {
         /// ```
         pub fn swizzle_and_resize(self: Self, comptime mask: []const u8) 
             switch (mask.len) {
-                2 => vec2.Vector2(FType),
-                3 => Self,
-                4 => vec4.Vector4(FType),
+                2 => V2Type, 3 => Self, 4 => V4Type,
                 else => @compileError("`swizzle_and_resize` mask length must be 2, 3 or 4"),
             }
         {
@@ -517,7 +519,7 @@ pub fn Vector3A(comptime FType: type) type {
                     else => @compileError("invalid axis label (must be x, y, z or 0)"),
                 };
             }
-            if (mask.len == 3) order[3] = 0;
+            if (mask.len == 3) order[3] = 3;
 
             return @bitCast(@shuffle(FType, self.as_vec(), undefined, order));
         }
@@ -556,12 +558,16 @@ test {
     try t.expectEqual(1.5, a.z);
 
     var zz3 = a.swizzle_and_resize("xyz");
+    try t.expectEqual(0.5, zz3.x);
+    try t.expectEqual(1.0, zz3.y);
+    try t.expectEqual(1.5, zz3.z);
+
+    _ = zz3.recip_sqrt_fast();
+
     const zz2 = zz3.swizzle_and_resize("xy");
     const zz4 = zz3.swizzle_and_resize("xyxy");
     _ = zz2;
     _ = zz4;
-
-    _ = zz3.recip_sqrt_fast();
 
     const b = Vec3A.init(2, 0, 0);
     try t.expectEqual(1, b.clamp_length_max(1).x);

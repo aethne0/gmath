@@ -12,10 +12,11 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    mod.addCSourceFile(.{
-        .file = b.path("src/intrin.c"),
-        .flags = &.{"-msse4.1"},
-    });
+    // mod.addCSourceFile(.{
+    //     .file = b.path("src/intrin.c"),
+    //     .flags = &.{"-msse4.1"},
+    // });
+
     mod.link_libc = true;
 
     // 2. Main Library Artifact
