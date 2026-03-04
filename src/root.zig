@@ -50,3 +50,7 @@ test {
     std.testing.refAllDecls(@This()); 
 }
 
+// -O ReleaseFast -mcpu znver5
+// -O ReleaseFast -target aarch64-linux-gnu -mcpu cortex_a55
+// -C opt-level=3 -C target-cpu=znver5
+// -C opt-level=3 -C target-cpu=cortex_a55

@@ -1,11 +1,12 @@
 const std = @import("std");
+const vector_common = @import("vector_common.zig");
 
 pub fn Vector4(comptime FType: type) type {
-    if (FType != f32 and FType != f64 and FType != f128) 
-        @compileError("fType must be f32, f64, f128");
+    if (FType != f32 and FType != f64) @compileError("fType must be f32 | f64");
 
     return extern struct {
         const Self = @This();
+        const shared = vector_common.VectorAlignedCommon(FType, 4);
 
         x:      FType align(@sizeOf(FType) * 4),
         y:      FType,
@@ -18,172 +19,90 @@ pub fn Vector4(comptime FType: type) type {
             return .{ .x = x, .y = y, .z = z, .w = w };
         }
 
-        pub inline fn splat(scalar: FType) Self {
-            const result: @Vector(4, FType) = @splat(scalar);
-            return @bitCast(result);
-        }
+        const as_vec = shared.as_vec;
 
-        pub const ZERO      = splat(0);
-        pub const ONE       = splat(1);
-        pub const NEG_ONE   = splat(-1);
+        pub const splat = shared.splat;
+
+        /// X-direction unit vector
         pub const X         = init(1, 0, 0, 0);
+        /// Y-direction unit vector
         pub const Y         = init(0, 1, 0, 0);
+        /// Z-direction unit vector
         pub const Z         = init(0, 0, 1, 0);
+        /// W-direction unit vector
         pub const W         = init(0, 0, 0, 1);
+        /// negative X-direction unit vector
         pub const NEG_X     = init(-1, 0, 0, 0);
+        /// negative Y-direction unit vector
         pub const NEG_Y     = init(0, -1, 0, 0);
+        /// negative Z-direction unit vector
         pub const NEG_Z     = init(0, 0, -1, 0);
+        /// negative W-direction unit vector
         pub const NEG_W     = init(0, 0, 0, -1);
-        pub const MIN       = splat(std.math.floatMin(FType));
-        pub const MAX       = splat(std.math.floatMax(FType));
-        pub const NAN       = splat(std.math.nan(FType));
-        pub const INF       = splat(std.math.inf(FType));
-        pub const NEG_INF   = splat(-std.math.inf(FType));
+        /// array of all positive unit vectors
         pub const AXES      = [_]Self{ X, Y, Z, W };
 
-        inline fn as_vec(self: Self) @Vector(4, FType) {
-            return @bitCast(self);
-        }
+        pub const ZERO = shared.ZERO;
+        pub const ONE = shared.ONE;
+        pub const NEG_ONE = shared.NEG_ONE;
+        pub const MIN = shared.MIN;
+        pub const MAX = shared.MAX;
+        pub const NAN = shared.NAN;
+        pub const INF = shared.INF;
+        pub const NEG_INF = shared.NEG_INF;
 
-        pub fn add(self: Self, other: Self) Self {
-            return @bitCast( self.as_vec() + other.as_vec() );
-        }
+        pub const add = shared.add;
+        pub const sub = shared.sub;
+        pub const mul = shared.mul;
+        pub const mul_add = shared.mul_add;
+        pub const add_scalar  = shared.add_scalar;
+        pub const sub_scalar  = shared.sub_scalar;
+        pub const mul_scalar  = shared.mul_scalar;
+        pub const neg  = shared.neg;
+        pub const ceil  = shared.ceil;
+        pub const round  = shared.round;
+        pub const floor  = shared.floor;
+        pub const sin  = shared.sin;
+        pub const cos  = shared.cos;
+        pub const ln  = shared.ln;
+        pub const log2  = shared.log2;
+        pub const exp  = shared.exp;
+        pub const exp2  = shared.exp2;
+        pub const recip  = shared.recip;
+        pub const sqrt  = shared.sqrt;
+        pub const recip_sqrt_fast  = shared.recip_sqrt_fast;
+        pub const abs  = shared.abs;
+        pub const min  = shared.min;
+        pub const max  = shared.max;
+        pub const saturate = shared.saturate;
+        pub const length_squared = shared.length_squared;
+        pub const length = shared.length;
+        pub const length_recip = shared.length_recip;
+        pub const clamp_length_max = shared.clamp_length_max;
+        pub const clamp_length_min = shared.clamp_length_min;
+        pub const clamp_length = shared.clamp_length;
+        pub const set_length = shared.set_length;
+        pub const distance_squared = shared.distance_squared;
+        pub const distance = shared.distance;
+        pub const distance_recip = shared.distance_recip;
+        pub const normalize = shared.normalize;
+        pub const normalize_and_length = shared.normalize_and_length;
+        pub const normalize_or_zero = shared.normalize_or_zero;
+        pub const is_normalized = shared.is_normalized;
+        pub const lerp = shared.lerp;
+        pub const midpoint = shared.midpoint;
+        pub const swizzle = shared.swizzle;
 
-        pub fn sub(self: Self, other: Self) Self {
-            return @bitCast( self.as_vec() - other.as_vec() );
-        }
+        pub const product  = shared.product;
+        pub const min_element  = shared.min_element;
+        pub const max_element  = shared.max_element;
+        pub const sum  = shared.sum;
+        pub const eq = shared.eq;
+        pub const clamp_by_scalars = shared.clamp_by_scalars;
+        pub const clamp = shared.clamp;
+        pub const div = shared.div;
+        pub const div_scalar = shared.div_scalar;
 
-        pub fn mul(self: Self, other: Self) Self {
-            return @bitCast(self.as_vec() * other.as_vec());
-        }
-
-        pub fn div(self: Self, other: Self) Self {
-            return @bitCast(self.as_vec() / other.as_vec());
-        }
-
-        pub fn add_scalar(self: Self, scalar: FType) Self {
-            return self.add(splat(scalar));
-        }
-
-        pub fn sub_scalar(self: Self, scalar: FType) Self {
-            return self.sub(splat(scalar));
-        }
-
-        pub fn mul_scalar(self: Self, scalar: FType) Self {
-            return self.mul(splat(scalar));
-        }
-
-        pub fn div_scalar(self: Self, scalar: FType) Self {
-            return self.div(splat(scalar));
-        }
-
-        pub fn neg(self: Self) Self {
-            return self.mul_scalar(-1);
-        }
-
-        pub fn sum(self: Self) FType {
-            return @reduce(.Add, self.as_vec());
-        }
-
-        pub fn product(self: Self) FType {
-            return @reduce(.Mul, self.as_vec_3());
-        }
-
-        pub fn min_element(self: Self) FType {
-            return @reduce(.Min, self.as_vec_3());
-        }
-
-        pub fn max_element(self: Self) FType {
-            return @reduce(.Max, self.as_vec_3());
-        }
-
-        pub fn abs(self: Self) Self {
-            return @bitCast(@abs(self.as_vec()));
-        }
-
-        pub fn dot(self: Self, other: Self) FType {
-            return self.mul(other).sum();
-        }
-
-        pub fn max(self: Self, other: Self) Self {
-            return @bitCast(@max(self.as_vec(), other.as_vec()));
-        }
-
-        pub fn min(self: Self, other: Self) Self {
-            return @bitCast(@min(self.as_vec(), other.as_vec()));
-        }
-
-        /// Note: This is not gauranteed to observe IEEE 754.
-        /// on x86_64 it will probably emit `vmaxps`/`vminps` which do not.
-        pub fn clamp(self: Self, lower_bound: FType, upper_bound: FType) Self {
-            if (lower_bound > upper_bound) @panic("called clamp with lower_bound > upper_bound");
-
-            var res = self.as_vec();
-            res = @min(res, splat(upper_bound).as_vec());
-            res = @max(res, splat(lower_bound).as_vec());
-            return @bitCast(res);
-        }
-
-        pub fn length_squared(self: Self) FType {
-            return self.mul(self).sum();
-        }
-
-        pub fn length(self: Self) FType {
-            return @sqrt(self.length_squared()); // i BELIEVE in llvm inlining
-        }
-
-        /// Distance from self -> other
-        /// When called as a method you can read this as "distanceTo"
-        pub fn distance_squared(self: Self, other: Self) FType {
-            const diff = other.sub(self);
-            return diff.mul(diff).sum();
-        }
-
-        /// Distance from self -> other
-        /// When called as a method you can read this as "distanceTo"
-        pub fn distance(self: Self, other: Self) FType {
-            return @sqrt(distance(self, other));
-        }
-
-        pub fn normalize(self: Self) Self {
-            const len = self.length();
-            if (len == 0) @panic("tried to normalize zero length vector");
-            return self.div_scalar(len);
-        }
-
-        pub fn normalize_or_zero(self: Self) Self {
-            const len = self.length();
-            if (len == 0) return self.ZERO;
-            return self.div_scalar(len);
-        }
-        
-        pub fn swizzle(self: Self, comptime mask: []const u8) Self {
-            if (mask.len != 4) @compileError("swizzle mask must be length equal to dimensions (4)");
-
-            comptime var order: [4]isize = undefined;
-            inline for (mask, 0..) |char, i| {
-                order[i] = switch(char) {
-                    'x' => 0, 'y' => 1, 'z' => 2, 'w' => 3,
-                    else => @compileError("invalid axis label"),
-                };
-            }
-
-            return @bitCast(@shuffle(FType, self.as_vec(), undefined, order));
-        }
-
-        pub fn project(self: Self, other: Self) Self {
-            const other_length_squared = other.length_squared();
-            if (other_length_squared == 0) @panic("tried to project onto zero length vector");
-            return other.mul_scalar(self.dot(other) / other_length_squared);
-        }
-
-        pub fn project_or_zero(self: Self, other: Self) Self {
-            const other_length_squared = other.length_squared();
-            if (other_length_squared == 0) return ZERO;
-            return other.mul_scalar(self.dot(other) / other_length_squared);
-        }
-
-        // todo: extends etc once more vectors are implemented
     };
 }
 
@@ -201,7 +120,7 @@ test {
     try t.expectEqual(-99, asd.y);
     try t.expectEqual(1, asd.z);
 
-    var a = Vec4.init(0, 1, 2, 3).clamp(0.5, 1.5);
+    var a = Vec4.init(0, 1, 2, 3).clamp_by_scalars(0.5, 1.5);
     try t.expectEqual(0.5, a.x);
     try t.expectEqual(1.0, a.y);
     try t.expectEqual(1.5, a.z);
