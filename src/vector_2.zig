@@ -45,11 +45,11 @@ pub fn Vector2(comptime FType: type) type {
         pub const sub = shared.sub;
         pub const mul = shared.mul;
         pub const div = shared.div;
-        pub const add_scalar  = shared.add_scalar;
-        pub const sub_scalar  = shared.sub_scalar;
-        pub const mul_scalar  = shared.mul_scalar;
-        pub const div_scalar = shared.div_scalar;
-        pub const mul_add = shared.mul_add;
+        pub const addScalar  = shared.addScalar;
+        pub const subScalar  = shared.subScalar;
+        pub const mulByScalar  = shared.mulByScalar;
+        pub const divByScalar = shared.divByScalar;
+        pub const mulAdd = shared.mulAdd;
         pub const neg  = shared.neg;
         pub const ceil  = shared.ceil;
         pub const round  = shared.round;
@@ -62,50 +62,68 @@ pub fn Vector2(comptime FType: type) type {
         pub const exp2  = shared.exp2;
         pub const recip  = shared.recip;
         pub const sqrt  = shared.sqrt;
-        pub const recip_sqrt_fast  = shared.recip_sqrt_fast;
+        pub const recipSqrtFast  = shared.recipSqrtFast;
         pub const abs  = shared.abs;
         pub const min  = shared.min;
         pub const max  = shared.max;
         pub const saturate = shared.saturate;
-        pub const length_squared = shared.length_squared;
+        pub const lengthSquared = shared.lengthSquared;
         pub const length = shared.length;
-        pub const length_recip = shared.length_recip;
-        pub const clamp_length_max = shared.clamp_length_max;
-        pub const clamp_length_min = shared.clamp_length_min;
-        pub const clamp_length = shared.clamp_length;
-        pub const set_length = shared.set_length;
-        pub const distance_squared = shared.distance_squared;
+        pub const lengthRecip = shared.lengthRecip;
+        pub const clampLengthMax = shared.clampLengthMax;
+        pub const clampLengthMin = shared.clampLengthMin;
+        pub const clampLength = shared.clampLength;
+        pub const setLength = shared.setLength;
+        pub const distanceSquared = shared.distanceSquared;
         pub const distance = shared.distance;
-        pub const distance_recip = shared.distance_recip;
+        pub const distanceReciprocal = shared.distanceReciprocal;
         pub const normalize = shared.normalize;
-        pub const normalize_and_length = shared.normalize_and_length;
-        pub const normalize_or_zero = shared.normalize_or_zero;
-        pub const is_normalized = shared.is_normalized;
+        pub const normalizeAndLength = shared.normalizeAndLength;
+        pub const normalizeOrZero = shared.normalizeOrZero;
+        pub const isNormalized = shared.isNormalized;
         pub const lerp = shared.lerp;
         pub const midpoint = shared.midpoint;
         pub const swizzle = shared.swizzle;
 
         pub const product  = shared.product;
-        pub const min_element  = shared.min_element;
-        pub const max_element  = shared.max_element;
+        pub const minElement  = shared.minElement;
+        pub const maxElement  = shared.maxElement;
         pub const sum  = shared.sum;
         pub const eq = shared.eq;
-        pub const clamp_by_scalars = shared.clamp_by_scalars;
+        pub const clampByScalars = shared.clampByScalars;
         pub const clamp = shared.clamp;
 
     };
 }
 
+/// 2-dimensional f32 vector
+pub const Vec2 = Vector2(f32);
+/// 2-dimensional f64 vector
+pub const Vec2f64 = Vector2(f64);
 
-test {
-    const Vec2  = Vector2(f32);
 
+// ▄▄▄▄▄▄▄▄ ..▄▄ · ▄▄▄▄▄.▄▄ · 
+// •██  ▀▄.▀·▐█ ▀. •██  ▐█ ▀. 
+//  ▐█.▪▐▀▀▪▄▄▀▀▀█▄ ▐█.▪▄▀▀▀█▄
+//  ▐█▌·▐█▄▄▌▐█▄▪▐█ ▐█▌·▐█▄▪▐█
+//  ▀▀▀  ▀▀▀  ▀▀▀▀  ▀▀▀  ▀▀▀▀ 
+
+fn Vec2Tests (FType: type) type {
     const t = std.testing;
 
-    const some = Vec2.init(1, 2);
-    try t.expectEqual(1, some.x);
-    try t.expectEqual(2, some.y);
+    return struct  {
+        const VType = Vector2(FType);
 
-    // todo tests
+        test "stuff" {
+            const some = VType.init(1, 2);
+            try t.expectEqual(1, some.x);
+            try t.expectEqual(2, some.y);
+        }
+    };
+}
+
+comptime {
+    _ = Vec2Tests(f32);
+    _ = Vec2Tests(f64);
 }
 

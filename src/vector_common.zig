@@ -5,7 +5,15 @@ const std = @import("std");
 // -C opt-level=3 -C target-cpu=cortex_a55
 
 /// Common implementations of methods for Vec2, Vec3A, Vec4
-pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
+pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int, OurType: type) type {
+    // note: OurType can be derived from Dims, of course, but it means that another 
+    // equivalent but anonymous type will be created that isn't linked to the actual type of 
+    // the implementation calling this - this makes it so my ZLS won't give us any info about
+    // these shared functions when calling them from the actual concrete implementations (Vec3A, Vec4, Vec2)
+    //
+    // The code still compiles and works though, so this may be a ZLS shortcoming (not that 
+    // there aren't reasons to avoid having your LSP do 10 layers of monomorphization to give
+    // you information).
     const BitsType = switch (FType) { 
         f32 => u128, f64 => u256,
         else => @compileError("FType must be f32 | f64"),
@@ -17,12 +25,6 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
     const Our2Type = @import("vector_2.zig").Vector2(FType);
     const Our3Type = @import("vector_3a.zig").Vector3A(FType);
     const Our4Type = @import("vector_4.zig").Vector4(FType);
-    const OurType = switch (Dims) {
-        2 => Our2Type,
-        3 => Our3Type,
-        4 => Our4Type,
-        else => unreachable
-    };
 
     return struct {
         const Self = OurType;
@@ -78,7 +80,7 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
 
         /// Element-wise (self * multiplier) + addend. 
         /// Will use fused multiply add optimizations if available.
-        pub fn mul_add(self: Self, multiplier: Self, addend: Self) Self {
+        pub fn mulAdd(self: Self, multiplier: Self, addend: Self) Self {
             return @bitCast(
                 @mulAdd(VType,
                     as_vec(self),
@@ -89,28 +91,28 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
         }
 
         /// Adds scalar to each element
-        pub fn add_scalar(self: Self, scalar: FType) Self {
+        pub fn addScalar(self: Self, scalar: FType) Self {
             return self.add(splat(scalar));
         }
 
         /// Subtracts scalar from each element
-        pub fn sub_scalar(self: Self, scalar: FType) Self {
+        pub fn subScalar(self: Self, scalar: FType) Self {
             return self.sub(splat(scalar));
         }
 
         /// Multiplies each element by scalar
-        pub fn mul_scalar(self: Self, scalar: FType) Self {
+        pub fn mulByScalar(self: Self, scalar: FType) Self {
             return self.mul(splat(scalar));
         }
 
         /// Divides each element by scalar
-        pub fn div_scalar(self: Self, scalar: FType) Self {
+        pub fn divByScalar(self: Self, scalar: FType) Self {
             return div(self, splat(scalar));
         }
 
         /// Element-wise negate
         pub fn neg(self: Self) Self {
-            return self.mul_scalar(-1);
+            return mulByScalar(self, -1);
         }
 
         /// Element-wise ceil
@@ -170,7 +172,7 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
 
         /// Approximate reciprocal square root of each element, only faster on arch that supports it,
         /// and usually only for f32.
-        pub fn recip_sqrt_fast(self: Self) Self {
+        pub fn recipSqrtFast(self: Self) Self {
             // todo: perf
             // this doesnt seem to emit anything very good for aarch64 (f32, probably not f64 either)
             // https://godbolt.org/z/9x4vjfozn
@@ -214,31 +216,31 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
         }
 
         /// Square of the length of the vector, skips computing sqrt
-        pub fn length_squared(self: Self) FType {
+        pub fn lengthSquared(self: Self) FType {
             return self.mul(self).sum();
         }
 
         /// Length of the vector
         pub fn length(self: Self) FType {
-            return @sqrt(self.length_squared()); // i BELIEVE in llvm inlining
+            return @sqrt(lengthSquared(self)); // i BELIEVE in llvm inlining
         }
 
         /// Reciprocal of the length of the vector (1 / length)
-        pub fn length_recip(self: Self) FType {
+        pub fn lengthRecip(self: Self) FType {
             return ONE.div(self.length());
         }
 
         /// Sets length of vector to `upper_bound` if it is exceeding `upper_bound`, otherwise does nothing.
         /// Does not affect the direction of the vector. `upper_bound` must be zero or positive.
-        pub fn clamp_length_max(self: Self, upper_bound: FType) Self {
+        pub fn clampLengthMax(self: Self, upper_bound: FType) Self {
             if (upper_bound < 0) std.debug.panic("clamp_length_max upper_bound must be >= 0", .{});
             if (upper_bound == 0) return ZERO;
 
-            const sqr_length = self.length_squared();
+            const sqr_length = lengthSquared(self);
             const sqr_upper_bound = upper_bound * upper_bound;
 
             if (sqr_length > sqr_upper_bound) {
-                return self.mul_scalar(upper_bound / @sqrt(sqr_length));
+                return mulByScalar(self, upper_bound / @sqrt(sqr_length));
             } else {
                 return self;
             }
@@ -247,15 +249,15 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
         /// Sets length of vector to `lower_bound` if it is less-than `lower_bound`, otherwise does nothing.
         /// Does not affect the direction of the vector. `lower_bound` must be zero or positive.
         /// PANICS if length of `self` is 0!
-        pub fn clamp_length_min(self: Self, lower_bound: FType) Self {
+        pub fn clampLengthMin(self: Self, lower_bound: FType) Self {
             if (lower_bound < 0) std.debug.panic("clamp_length_min lower_bound must be >= 0", .{});
 
-            const sqr_length = self.length_squared();
+            const sqr_length = lengthSquared(self);
             if (sqr_length == 0) std.debug.panic("tried to clamp_min_length zero length vector", .{});
             const sqr_lower_bound = lower_bound * lower_bound;
 
             if (sqr_length < sqr_lower_bound) {
-                return self.mul_scalar(lower_bound / @sqrt(sqr_length));
+                return mulByScalar(self, lower_bound / @sqrt(sqr_length));
             } else {
                 return self;
             }
@@ -266,20 +268,21 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
         /// this inclusive range this will have no effect.
         /// Does not affect the direction of the vector.
         /// `lower_bound` and `upper_bound` must be zero or positive.
-        pub fn clamp_length(self: Self, lower_bound: FType, upper_bound: FType) Self {
+        pub fn clampLength(self: Self, lower_bound: FType, upper_bound: FType) Self {
             if (lower_bound > upper_bound) std.debug.panic("lower_ bound must be <= upper_bound", .{});
-            return self.clamp_length_max(upper_bound).clamp_length_min(lower_bound);
+            const max_clamped = clampLengthMax(self, upper_bound);
+            return clampLengthMin(max_clamped, lower_bound);
         }
 
         /// Scales vector so that length is `len`, does not affect direction. `len` must be >= 0;
-        pub fn set_length(self: Self, len: FType) Self {
+        pub fn setLength(self: Self, len: FType) Self {
             if (len < 0) std.debug.panic("length cannot be < 0", .{});
             return self.mul_scalar(len / self.length_recip());
         }
 
         /// Distance from self -> other
         /// When called as a method you can read this as "distanceTo"
-        pub fn distance_squared(self: Self, other: Self) FType {
+        pub fn distanceSquared(self: Self, other: Self) FType {
             const diff = other.sub(self);
             return diff.mul(diff).sum();
         }
@@ -292,7 +295,7 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
 
         /// One over the distance of self -> other
         /// When called as a method you can read this as "distanceRecipTo"
-        pub fn distance_recip(self: Self, other: Self) FType {
+        pub fn distanceReciprocal(self: Self, other: Self) FType {
             // todo: perf
             return ONE.div(distance(self, other));
         }
@@ -302,27 +305,27 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
         pub fn normalize(self: Self) Self {
             const len = self.length();
             if (len == 0) std.debug.panic("tried to normalize zero length vector", .{});
-            return self.div_scalar(len);
+            return divByScalar(self, len);
         }
 
         /// Scales vector such that it is length=1, does not affect direction.
         /// Also returns the length, which was computed as a side-effect.
         /// PANICS if length is zero!
-        pub fn normalize_and_length(self: Self) struct { vec: Self, length: FType } {
+        pub fn normalizeAndLength(self: Self) struct { vec: Self, length: FType } {
             const len = self.length();
             if (len == 0) std.debug.panic("tried to normalize zero length vector", .{});
-            return .{ .vec = self.div_scalar(len), .length = len };
+            return .{ .vec = divByScalar(self, len), .length = len };
         }
 
         /// Scales vector such that it is length=1, does not affect direction.
         /// Returns ZERO vector if length is zero!
-        pub fn normalize_or_zero(self: Self) Self {
+        pub fn normalizeOrZero(self: Self) Self {
             const len = self.length();
             if (len == 0) return self.ZERO;
             return self.div_scalar(len);
         }
 
-        pub fn is_normalized(self: Self) Self {
+        pub fn isNormalized(self: Self) Self {
             return @abs(self.length_squared() - 1) <= std.math.floatEpsAt(FType, 1);
         }
 
@@ -375,7 +378,7 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
         /// _ = original.swizzle_and_resize("xx")   // -> Vec2  { 1, 1 }
         /// _ = original.swizzle_and_resize("zyx")  // -> Vec3A { 3, 2, 1 }
         /// ```
-        pub fn swizzle_and_resize(self: Self, comptime mask: []const u8) 
+        pub fn swizzleResize(self: Self, comptime mask: []const u8) 
             switch (mask.len) {
                 2 => Our2Type, 3 => Our3Type, 4 => Our4Type,
                 else => @compileError("`swizzle_and_resize` mask length must be 2, 3 or 4"),
@@ -422,12 +425,12 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
         }
 
         /// min of all elements
-        pub fn min_element(self: Self) FType {
+        pub fn minElement(self: Self) FType {
             return @reduce(.Min, self.as_vec_3());
         }
 
         /// max of all elements
-        pub fn max_element(self: Self) FType {
+        pub fn maxElement(self: Self) FType {
             return @reduce(.Max, self.as_vec_3());
         }
 
@@ -449,7 +452,7 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
         /// Clamps each element to [lower_bound, upper_bound]
         /// Note: This is not gauranteed to observe IEEE 754.
         /// on x86_64 it will probably emit `vmaxps`/`vminps` which do not.
-        pub fn clamp_by_scalars(self: Self, lower_bound: FType, upper_bound: FType) Self {
+        pub fn clampByScalars(self: Self, lower_bound: FType, upper_bound: FType) Self {
             if (lower_bound > upper_bound)
                 std.debug.panic(
                     \\ called clamp with lower_bound > upper_bound:

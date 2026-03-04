@@ -12,7 +12,7 @@ pub fn Vector3A(comptime FType: type) type {
 
     return extern struct {
         const Self = @This();
-        const shared = vector_common.VectorAlignedCommon(FType, 3);
+        const shared = vector_common.VectorAlignedCommon(FType, 3, Self);
 
         x:      FType align(@sizeOf(FType) * 4),
         y:      FType,
@@ -58,11 +58,11 @@ pub fn Vector3A(comptime FType: type) type {
         pub const sub = shared.sub;
         pub const mul = shared.mul;
         pub const div = shared.div;
-        pub const mul_add = shared.mul_add;
-        pub const add_scalar  = shared.add_scalar;
-        pub const sub_scalar  = shared.sub_scalar;
-        pub const mul_scalar  = shared.mul_scalar;
-        pub const div_scalar  = shared.div_scalar;
+        pub const mulAdd = shared.mulAdd;
+        pub const addScalar  = shared.addScalar;
+        pub const subScalar  = shared.subScalar;
+        pub const mulByScalar  = shared.mulByScalar;
+        pub const divByScalar  = shared.divByScalar;
         pub const neg  = shared.neg;
         pub const ceil  = shared.ceil;
         pub const round  = shared.round;
@@ -75,29 +75,29 @@ pub fn Vector3A(comptime FType: type) type {
         pub const exp2  = shared.exp2;
         pub const recip  = shared.recip;
         pub const sqrt  = shared.sqrt;
-        pub const recip_sqrt_fast  = shared.recip_sqrt_fast;
+        pub const recipSqrtFast  = shared.recipSqrtFast;
         pub const abs  = shared.abs;
         pub const min  = shared.min;
         pub const max  = shared.max;
         pub const saturate = shared.saturate;
-        pub const length_squared = shared.length_squared;
+        pub const lengthSquared = shared.lengthSquared;
         pub const length = shared.length;
-        pub const length_recip = shared.length_recip;
-        pub const clamp_length_max = shared.clamp_length_max;
-        pub const clamp_length_min = shared.clamp_length_min;
-        pub const clamp_length = shared.clamp_length;
-        pub const set_length = shared.set_length;
-        pub const distance_squared = shared.distance_squared;
+        pub const lengthRecip = shared.lengthRecip;
+        pub const clampLengthMax = shared.clampLengthMax;
+        pub const clampLengthMin = shared.clampLengthMin;
+        pub const clampLength = shared.clampLength;
+        pub const setLength = shared.setLength;
+        pub const distanceSquared = shared.distanceSquared;
         pub const distance = shared.distance;
-        pub const distance_recip = shared.distance_recip;
+        pub const distanceReciprocal = shared.distanceReciprocal;
         pub const normalize = shared.normalize;
-        pub const normalize_and_length = shared.normalize_and_length;
-        pub const normalize_or_zero = shared.normalize_or_zero;
-        pub const is_normalized = shared.is_normalized;
+        pub const normalizeAndLength = shared.normalizeAndLength;
+        pub const normalizeOrZero = shared.normalizeOrZero;
+        pub const isNormalized = shared.isNormalized;
         pub const lerp = shared.lerp;
         pub const midpoint = shared.midpoint;
         pub const swizzle = shared.swizzle;
-        pub const swizzle_and_resize = shared.swizzle_and_resize;
+        pub const swizzleResize = shared.swizzleResize;
 
         // This is to safely handle the pad element in some reduce operations (product, min, max)
         inline fn as_vec_3(self: Self) @Vector(3, FType) {
@@ -325,73 +325,91 @@ pub const Vec3A = Vector3A(f32);
 /// aligned 3-dimensional f64 vector
 pub const Vec3Af64 = Vector3A(f64);
 
-const t = std.testing;
 
+// ▄▄▄▄▄▄▄▄ ..▄▄ · ▄▄▄▄▄.▄▄ · 
+// •██  ▀▄.▀·▐█ ▀. •██  ▐█ ▀. 
+//  ▐█.▪▐▀▀▪▄▄▀▀▀█▄ ▐█.▪▄▀▀▀█▄
+//  ▐█▌·▐█▄▄▌▐█▄▪▐█ ▐█▌·▐█▄▪▐█
+//  ▀▀▀  ▀▀▀  ▀▀▀▀  ▀▀▀  ▀▀▀▀ 
 
-test "accept_div_by_zero" {
-    _ = Vec3A.ONE.div(Vec3A.ZERO);
+fn Vec3ATests (FType: type) type {
+    const t = std.testing;
+
+    return struct  {
+        const VType = Vector3A(FType);
+
+        test "clamp" {
+            var a = VType.init(0, 1, 2).clamp(VType.ZERO, VType.ONE);
+            try t.expectEqual(0.0, a.x);
+            try t.expectEqual(1.0, a.y);
+            try t.expectEqual(1.0, a.z);
+            try t.expectEqual(0, a._pad);
+        }
+
+        test "div_by_zero" {
+            _ = VType.ONE.div(VType.ZERO);
+        }
+
+        test "clamp_by_scalars" {
+            var a = VType.init(0, 1, 2).clamp_by_scalars(0.5, 1.5);
+            try t.expectEqual(0.5, a.x);
+            try t.expectEqual(1.0, a.y);
+            try t.expectEqual(1.5, a.z);
+            try t.expectEqual(0, a._pad);
+        }
+
+        test "swoz" {
+            const base = VType.init(1, 2, 3);
+            const swozr = base.swizzleResize("xxy");
+            const should_be = VType.init(1, 1, 2);
+            try t.expect(swozr.eq(should_be));
+        }
+
+        test "chungus" {
+            var asd = VType.Y.neg().mulByScalar(100);
+            _ = asd.swizzle("zyx").cross(VType.X).normalize();
+            asd = asd.swizzle("zyx").add(VType.X).add(VType.ONE);
+            _ = asd.to_vec4_zero_extend();
+            _ = asd.to_vec2_truncate();
+            try t.expectEqual(2, asd.x);
+            try t.expectEqual(-99, asd.y);
+            try t.expectEqual(1, asd.z);
+
+            var a = VType.init(0, 1, 2).clamp_by_scalars(0.5, 1.5);
+            try t.expectEqual(0.5, a.x);
+            try t.expectEqual(1.0, a.y);
+            try t.expectEqual(1.5, a.z);
+            a = a.neg().abs();
+            try t.expectEqual(0.5, a.x);
+            try t.expectEqual(1.0, a.y);
+            try t.expectEqual(1.5, a.z);
+
+            var zz3 = a.swizzleResize("xyz");
+            try t.expectEqual(0.5, zz3.x);
+            try t.expectEqual(1.0, zz3.y);
+            try t.expectEqual(1.5, zz3.z);
+
+            _ = zz3.recipSqrtFast();
+
+            const zz2 = zz3.swizzleResize("xy");
+            const zz4 = zz3.swizzleResize("xyxy");
+            _ = zz2;
+            _ = zz4;
+
+            const b = VType.init(2, 0, 0);
+            try t.expectEqual(1, b.clampLengthMax(1).x);
+            try t.expectEqual(3, b.clampLengthMin(3).x);
+            try t.expectEqual(2, b.clampLength(2, 2).x);
+
+            try t.expectEqual(2,b.normalizeAndLength().length);
+
+            _ = a.max(asd);
+        }
+    };
 }
 
-test "clamp" {
-    var a = Vec3A.init(0, 1, 2).clamp(Vec3A.ZERO, Vec3A.ONE);
-    try t.expectEqual(0.0, a.x);
-    try t.expectEqual(1.0, a.y);
-    try t.expectEqual(1.0, a.z);
-    try t.expectEqual(0, a._pad);
+comptime {
+    _ = Vec3ATests(f32);
+    _ = Vec3ATests(f64);
 }
 
-test "clamp_by_scalars" {
-    var a = Vec3A.init(0, 1, 2).clamp_by_scalars(0.5, 1.5);
-    try t.expectEqual(0.5, a.x);
-    try t.expectEqual(1.0, a.y);
-    try t.expectEqual(1.5, a.z);
-    try t.expectEqual(0, a._pad);
-}
-
-test "swoz" {
-    const base = Vec3A.init(1, 2, 3);
-    const swoz = base.swizzle_and_resize("xxy");
-    const should_be = Vec3A.init(1, 1, 2);
-    try t.expect(swoz.eq(should_be));
-}
-
-test "unlabeled_chungus_test" {
-    var asd = Vec3A.Y.neg().mul_scalar(100);
-    _ = asd.swizzle("zyx").cross(Vec3A.X).normalize();
-    asd = asd.swizzle("zyx").add(Vec3A.X).add(Vec3A.ONE);
-    _ = asd.to_vec4_zero_extend();
-    _ = asd.to_vec2_truncate();
-    try t.expectEqual(2, asd.x);
-    try t.expectEqual(-99, asd.y);
-    try t.expectEqual(1, asd.z);
-
-    var a = Vec3A.init(0, 1, 2).clamp_by_scalars(0.5, 1.5);
-    try t.expectEqual(0.5, a.x);
-    try t.expectEqual(1.0, a.y);
-    try t.expectEqual(1.5, a.z);
-    a = a.neg().abs();
-    try t.expectEqual(0.5, a.x);
-    try t.expectEqual(1.0, a.y);
-    try t.expectEqual(1.5, a.z);
-
-    var zz3 = a.swizzle_and_resize("xyz");
-    try t.expectEqual(0.5, zz3.x);
-    try t.expectEqual(1.0, zz3.y);
-    try t.expectEqual(1.5, zz3.z);
-
-    _ = zz3.recip_sqrt_fast();
-
-    const zz2 = zz3.swizzle_and_resize("xy");
-    const zz4 = zz3.swizzle_and_resize("xyxy");
-    _ = zz2;
-    _ = zz4;
-
-    const b = Vec3A.init(2, 0, 0);
-    try t.expectEqual(1, b.clamp_length_max(1).x);
-    try t.expectEqual(3, b.clamp_length_min(3).x);
-    try t.expectEqual(2, b.clamp_length(2, 2).x);
-
-    try t.expectEqual(2,b.normalize_and_length().length);
-
-    _ = a.max(asd);
-}
