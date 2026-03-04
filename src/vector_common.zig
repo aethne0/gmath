@@ -71,6 +71,11 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
             return @bitCast(as_vec(self) * as_vec(other));
         }
 
+        /// Element-wise divide
+        pub fn div(self: Self, other: Self) Self {
+            return @bitCast(as_vec(self) / as_vec(other));
+        }
+
         /// Element-wise (self * multiplier) + addend. 
         /// Will use fused multiply add optimizations if available.
         pub fn mul_add(self: Self, multiplier: Self, addend: Self) Self {
@@ -96,6 +101,11 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
         /// Multiplies each element by scalar
         pub fn mul_scalar(self: Self, scalar: FType) Self {
             return self.mul(splat(scalar));
+        }
+
+        /// Divides each element by scalar
+        pub fn div_scalar(self: Self, scalar: FType) Self {
+            return div(self, splat(scalar));
         }
 
         /// Element-wise negate
@@ -424,16 +434,6 @@ pub fn VectorAlignedCommon(comptime FType: type, Dims: comptime_int) type {
         /// Sum of all elements
         pub fn sum(self: Self) FType {
             return @reduce(.Add, as_vec(self));
-        }
-
-        /// Element-wise divide
-        pub fn div(self: Self, other: Self) Self {
-            return @bitCast(as_vec(self) / as_vec(other));
-        }
-
-        /// Divides each element by scalar
-        pub fn div_scalar(self: Self, scalar: FType) Self {
-            return div(self, splat(scalar));
         }
 
         /// Element-wise bitwise equality

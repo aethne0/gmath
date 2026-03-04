@@ -57,6 +57,7 @@ pub fn Vector3A(comptime FType: type) type {
         pub const add = shared.add;
         pub const sub = shared.sub;
         pub const mul = shared.mul;
+        pub const div = shared.div;
         pub const mul_add = shared.mul_add;
         pub const add_scalar  = shared.add_scalar;
         pub const sub_scalar  = shared.sub_scalar;
@@ -113,13 +114,6 @@ pub fn Vector3A(comptime FType: type) type {
             // return 0 != arch.x86._mm_testz_ps(result, result);
 
             return @as(BitsType, @bitCast(self.as_vec())) == @as(BitsType, @bitCast(other.as_vec()));
-        }
-
-        /// Element-wise divide
-        pub fn div(self: Self, other: Self) Self {
-            var result: Self = @bitCast(self.as_vec() / other.as_vec());
-            result._pad = 0;
-            return result;
         }
 
         /// Computes dot product with another vector

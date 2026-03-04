@@ -44,10 +44,12 @@ pub fn Vector2(comptime FType: type) type {
         pub const add = shared.add;
         pub const sub = shared.sub;
         pub const mul = shared.mul;
-        pub const mul_add = shared.mul_add;
+        pub const div = shared.div;
         pub const add_scalar  = shared.add_scalar;
         pub const sub_scalar  = shared.sub_scalar;
         pub const mul_scalar  = shared.mul_scalar;
+        pub const div_scalar = shared.div_scalar;
+        pub const mul_add = shared.mul_add;
         pub const neg  = shared.neg;
         pub const ceil  = shared.ceil;
         pub const round  = shared.round;
@@ -90,8 +92,6 @@ pub fn Vector2(comptime FType: type) type {
         pub const eq = shared.eq;
         pub const clamp_by_scalars = shared.clamp_by_scalars;
         pub const clamp = shared.clamp;
-        pub const div = shared.div;
-        pub const div_scalar = shared.div_scalar;
 
     };
 }
